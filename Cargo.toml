@@ -11,5 +11,6 @@ name = "lcp"
 path = "src/main.rs"
 
 [dependencies]
+anyhow = "1.0.100"
 clap = { version = "4.5.54", features = ["derive", "env"] }
 ssh2 = "0.9.5"

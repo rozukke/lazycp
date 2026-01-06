@@ -5,6 +5,7 @@ compile_error!(
 
 use std::{fs::OpenOptions, path::PathBuf};
 
+use anyhow::{Context, Result};
 use clap::{Parser, Subcommand};
 
 /// The easiest way to copy for people who have too many terminals open.
@@ -62,7 +63,7 @@ enum Command {
     Clear,
 }
 
-fn main() -> Result<(), Box<dyn std::error::Error>> {
+fn main() -> Result<()> {
     let args = Cli::parse();
     let histfile = args
         .histfile
@@ -80,15 +81,16 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 None
             }
         })
-        .expect(
-            "Could not find valid $XDG_CACHE_HOME or $HOME, please provide a valid --histfile location.",
-        );
-    std::fs::create_dir_all(&histfile.parent().unwrap())?;
+        .context("Could not find valid $XDG_CACHE_HOME or $HOME, please provide a valid --histfile location.")?;
+    std::fs::create_dir_all(&histfile.parent().unwrap())
+        .context("Could not create parent directories when writing histfile.")?;
+
     let histfile = OpenOptions::new()
         .create(true)
         .read(true)
         .append(true)
-        .open(&histfile)?;
+        .open(&histfile)
+        .context("Could not create or open histfile for appending.")?;
 
     match args.command {
         Command::Copy { files } => todo!(),
