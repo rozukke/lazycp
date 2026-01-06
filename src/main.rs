@@ -7,6 +7,7 @@ use std::{fs::OpenOptions, path::PathBuf};
 
 use anyhow::{Context, Result};
 use clap::{Parser, Subcommand};
+use lazycp::{HistoryType, histfile_contents, histfile_entry};
 
 /// The easiest way to copy for people who have too many terminals open.
 #[derive(Parser)]
@@ -42,7 +43,7 @@ enum Command {
         dest: Option<PathBuf>,
         /// Advanced usecase - provide a host to copy from over SSH. Provide an alternative
         /// --histfile if you did not copy with the same user as provided in the host string
-        #[arg(long, short)]
+        #[arg(long, short = 't')]
         host: Option<String>,
         /// Resolves symlinks to the original file when provided
         #[arg(long, short)]
@@ -93,14 +94,14 @@ fn main() -> Result<()> {
         .context("Could not create or open histfile for appending.")?;
 
     match args.command {
-        Command::Copy { files } => todo!(),
-        Command::Move { files } => todo!(),
+        Command::Copy { files } => histfile_entry(histfile, HistoryType::Copy, files),
+        Command::Move { files } => histfile_entry(histfile, HistoryType::Move, files),
         Command::Paste {
             dest,
             host,
             resolve_symlinks,
             index,
-        } => todo!(),
+        } => histfile_contents(histfile),
         Command::Clear => todo!(),
         Command::History { number } => todo!(),
     }
