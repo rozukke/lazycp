@@ -1,8 +1,9 @@
-use anyhow::{Context, Result};
+use anyhow::{Context, Result, bail};
+use reverse_lines::ReverseLines;
 use std::{
     fmt,
-    fs::File,
-    io::{Read, Write},
+    fs::{self, File},
+    io::{BufReader, Read, Write},
     path::PathBuf,
 };
 
@@ -25,22 +26,54 @@ impl fmt::Display for HistoryType {
     }
 }
 
-pub fn histfile_entry(
+pub struct HistfileEntry {
+    hist_type: HistoryType,
+    paths: Vec<PathBuf>,
+}
+
+pub fn make_histfile_entry(
     mut histfile: File,
     hist_type: HistoryType,
     paths: Vec<PathBuf>,
 ) -> Result<()> {
+    let work_dir = std::env::current_dir().context("Could not stat current working directory")?;
     writeln!(
         histfile,
-        "'{hist_type}' '{}'",
+        "{hist_type},{}",
         paths
             .iter()
-            .filter_map(|x| x.to_str())
-            .collect::<Vec<&str>>()
-            .join("' '")
+            .map(|path| work_dir.join(path))
+            .filter_map(|x| x.to_str().map(|s| s.to_string()))
+            .collect::<Vec<String>>()
+            .join(",")
     )
     .context("Could not create entry in histfile. Aborting...")?;
     Ok(())
+}
+
+fn read_histfile_entry(histfile: File, _index: usize) -> Result<Option<HistfileEntry>> {
+    let rev_lines = ReverseLines::new(BufReader::new(histfile))
+        .context("Could not iterate through histfile lines")?;
+
+    let last_line = match rev_lines.into_iter().nth(0) {
+        Some(line) => line,
+        None => return Ok(None),
+    }
+    .context("Could not get nth line from histfile")?;
+
+    let words: Vec<&str> = last_line.split(",").into_iter().collect();
+
+    // SAFETY: assert
+    assert!(words.len() >= 2);
+    let hist_type = match *(unsafe { words.get_unchecked(0) }) {
+        "mv" => HistoryType::Move,
+        "cp" => HistoryType::Copy,
+        _ => bail!("Invalid history type"),
+    };
+
+    let paths: Vec<PathBuf> = words[1..].iter().copied().map(PathBuf::from).collect();
+
+    Ok(Some(HistfileEntry { hist_type, paths }))
 }
 
 pub fn histfile_contents(mut histfile: File) -> Result<()> {
@@ -50,3 +83,34 @@ pub fn histfile_contents(mut histfile: File) -> Result<()> {
     Ok(())
 }
 
+pub fn paste(histfile: File, dest: Option<PathBuf>) -> Result<()> {
+    let mut work_dir = std::env::current_dir()
+        .ok()
+        .context("Could not retreive working directory from env.")?;
+
+    // Overwrites if provided path is absolute
+    if let Some(user_dir) = dest {
+        work_dir = work_dir.join(user_dir);
+    }
+
+    if work_dir.is_file() {
+        bail!("User provided file instead of directory.")
+    }
+
+    if let Some(entry) = read_histfile_entry(histfile, 0)? {
+        match entry.hist_type {
+            HistoryType::Copy => entry.paths.iter().for_each(|path| {
+                if let Err(err) = fs::copy(path, &(work_dir.join(path.file_name().unwrap()))) {
+                    eprintln!(
+                        "Could not copy file {} to destination {}: {err}",
+                        path.to_str().unwrap(),
+                        work_dir.to_str().unwrap()
+                    );
+                };
+            }),
+            HistoryType::Move => todo!(),
+        };
+    };
+
+    Ok(())
+}

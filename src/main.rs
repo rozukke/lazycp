@@ -7,7 +7,7 @@ use std::{fs::OpenOptions, path::PathBuf};
 
 use anyhow::{Context, Result};
 use clap::{Parser, Subcommand};
-use lazycp::{HistoryType, histfile_contents, histfile_entry};
+use lazycp::{HistoryType, histfile_contents, make_histfile_entry, paste};
 
 /// The easiest way to copy for people who have too many terminals open.
 #[derive(Parser)]
@@ -94,15 +94,15 @@ fn main() -> Result<()> {
         .context("Could not create or open histfile for appending.")?;
 
     match args.command {
-        Command::Copy { files } => histfile_entry(histfile, HistoryType::Copy, files),
-        Command::Move { files } => histfile_entry(histfile, HistoryType::Move, files),
+        Command::Copy { files } => make_histfile_entry(histfile, HistoryType::Copy, files),
+        Command::Move { files } => make_histfile_entry(histfile, HistoryType::Move, files),
         Command::Paste {
             dest,
             host,
             resolve_symlinks,
             index,
-        } => histfile_contents(histfile),
+        } => paste(histfile, dest),
         Command::Clear => todo!(),
-        Command::History { number } => todo!(),
+        Command::History { number } => histfile_contents(histfile),
     }
 }
