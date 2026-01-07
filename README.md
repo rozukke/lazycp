@@ -1,5 +1,8 @@
 # lazycp - copying for the terminally ill
 
+> [!NOTE]
+> WORK IN PROGRESS! Currently, only basic file copying/pasting is implemented.
+
 If you have a few too many panes, terminal windows, tabs, muxers, commandlines, and various other
 shell doodads open at the same time, and just want to get one damn file from the working directory
 of one to the working directory of another, then *lazycp* is the app for you.
@@ -58,5 +61,5 @@ lps 100 # paste from 192.168.86.100
 Currently only for nerds who know how to build software.
 
 ```sh
-cargo install .
+cargo install --path .
 ```
