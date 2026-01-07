@@ -37,15 +37,21 @@ pub fn make_histfile_entry(
     paths: Vec<PathBuf>,
 ) -> Result<()> {
     let work_dir = std::env::current_dir().context("Could not stat current working directory")?;
+    let full_paths = paths
+        .into_iter()
+        .map(|path| work_dir.join(path))
+        .collect::<Vec<PathBuf>>();
+
     writeln!(
         histfile,
-        "{hist_type},{}",
-        paths
+        "{hist_type}\0{}",
+        full_paths
             .iter()
-            .map(|path| work_dir.join(path))
-            .filter_map(|x| x.to_str().map(|s| s.to_string()))
-            .collect::<Vec<String>>()
-            .join(",")
+            .map(|path| path.as_os_str())
+            .collect::<Vec<_>>()
+            .join(&std::ffi::OsStr::new("\0"))
+            .into_string()
+            .unwrap()
     )
     .context("Could not create entry in histfile. Aborting...")?;
     Ok(())
@@ -61,7 +67,7 @@ fn read_histfile_entry(histfile: File, _index: usize) -> Result<Option<HistfileE
     }
     .context("Could not get nth line from histfile")?;
 
-    let words: Vec<&str> = last_line.split(",").into_iter().collect();
+    let words: Vec<&str> = last_line.split("\0").into_iter().collect();
 
     // SAFETY: assert
     assert!(words.len() >= 2);
