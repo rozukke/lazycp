@@ -7,7 +7,7 @@ use std::{fs::OpenOptions, path::PathBuf};
 
 use anyhow::{Context, Result};
 use clap::{Parser, Subcommand};
-use lazycp::{HistoryType, histfile_contents, make_histfile_entry, paste};
+use lazycp::{copy, do_move, history, paste};
 
 /// The easiest way to copy for people who have too many terminals open.
 #[derive(Parser)]
@@ -51,6 +51,9 @@ enum Command {
         /// Index of item within copy/move history to paste
         #[arg(long, short)]
         index: Option<usize>,
+        /// Create non-existent parents of the destination directory. The option is there, I guess.
+        #[arg(long, short)]
+        parents: Option<bool>,
     },
     /// Show latest copy/move history
     #[command(aliases = &["hist", "h"])]
@@ -94,15 +97,16 @@ fn main() -> Result<()> {
         .context("Could not create or open histfile for appending.")?;
 
     match args.command {
-        Command::Copy { files } => make_histfile_entry(histfile, HistoryType::Copy, files),
-        Command::Move { files } => make_histfile_entry(histfile, HistoryType::Move, files),
+        Command::Copy { files } => copy(histfile, files),
+        Command::Move { files } => do_move(histfile, files),
         Command::Paste {
             dest,
             host,
             resolve_symlinks,
             index,
-        } => paste(histfile, dest),
+            parents,
+        } => paste(histfile, index, dest),
         Command::Clear => todo!(),
-        Command::History { number } => histfile_contents(histfile),
+        Command::History { number } => history(histfile, number),
     }
 }
