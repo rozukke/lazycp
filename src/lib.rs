@@ -9,12 +9,23 @@ use std::{
 use crate::histfile::{HistfileEntry, HistoryType};
 
 pub fn copy(histfile: File, paths: Vec<PathBuf>) -> Result<()> {
+    let (paths, invalid): (Vec<_>, Vec<_>) = paths.into_iter().partition(|f| f.is_file());
+    invalid.into_iter().for_each(|inv_path| {
+        eprintln!(
+            "File does not exist or is a directory: {}\nSkipping...",
+            inv_path.to_string_lossy()
+        )
+    });
     histfile::write_entry(histfile, HistoryType::Copy, paths)
 }
 
 // 'move' is a keyword :)
-pub fn do_move(histfile: File, paths: Vec<PathBuf>) -> Result<()> {
+pub fn move_cmd(histfile: File, paths: Vec<PathBuf>) -> Result<()> {
     histfile::write_entry(histfile, HistoryType::Move, paths)
+}
+
+pub fn clear(histfile: File) -> Result<()> {
+    histfile.set_len(0).context("Could not truncate histfile")
 }
 
 pub fn paste(histfile: File, index: Option<usize>, dest: Option<PathBuf>) -> Result<()> {
@@ -43,7 +54,7 @@ pub fn paste(histfile: File, index: Option<usize>, dest: Option<PathBuf>) -> Res
             };
         }),
         HistoryType::Move => entry.paths.iter().for_each(|path| {
-            if let Err(err) = fs::copy(path, &(work_dir.join(path.file_name().unwrap()))) {
+            if let Err(err) = fs::rename(path, &(work_dir.join(path.file_name().unwrap()))) {
                 eprintln!(
                     "Could not move file {} to destination {}: {err}",
                     path.to_str().unwrap(),
@@ -51,22 +62,26 @@ pub fn paste(histfile: File, index: Option<usize>, dest: Option<PathBuf>) -> Res
                 );
             };
         }),
+        HistoryType::Unknown => unreachable!(),
     };
 
     Ok(())
 }
 
 pub fn history(histfile: File, req_number: Option<usize>) -> Result<()> {
-    println!("Getting history");
     let num_entries = req_number.unwrap_or(5);
     let entries: Vec<HistfileEntry> = histfile::get_last_n(histfile, num_entries)
         .with_context(|| format!("Could not get last {} entries in histfile", num_entries))?;
-    println!("idx|type");
+    if entries.is_empty() {
+        bail!("No entries in histfile.");
+    }
+    println!("idx | type");
     entries.into_iter().enumerate().for_each(|(i, entry)| {
-        println!("({i}) {}", entry.hist_type);
+        println!("----------");
+        println!("{i:>3} | {}", entry.hist_type);
         entry.paths.iter().for_each(|path| {
             println!(
-                "\t> {}",
+                " > {}",
                 match path.to_str() {
                     Some(v) => v,
                     None => "Error: could not read entry",

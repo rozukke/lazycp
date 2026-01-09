@@ -3,22 +3,37 @@ use reverse_lines::ReverseLines;
 use std::{
     fmt,
     fs::File,
-    io::{BufReader, Read, Write},
+    io::{BufReader, Write},
     path::PathBuf,
 };
 
+use crate::histfile;
+
+#[derive(PartialEq, Eq)]
 pub enum HistoryType {
     Move,
     Copy,
+    Unknown,
 }
 
 impl fmt::Display for HistoryType {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         let text = match self {
-            Self::Move => "mv",
-            Self::Copy => "cp",
+            Self::Move => "MOVE",
+            Self::Copy => "COPY",
+            _ => return Err(std::fmt::Error),
         };
         write!(f, "{text}")
+    }
+}
+
+impl From<&str> for HistoryType {
+    fn from(value: &str) -> Self {
+        match value {
+            "COPY" => Self::Copy,
+            "MOVE" => Self::Move,
+            _ => Self::Unknown,
+        }
     }
 }
 
@@ -28,6 +43,10 @@ pub struct HistfileEntry {
 }
 
 pub fn write_entry(mut histfile: File, hist_type: HistoryType, paths: Vec<PathBuf>) -> Result<()> {
+    if paths.len() == 0 {
+        bail!("Could not write entry for zero-file copy.");
+    }
+
     let work_dir = std::env::current_dir().context("Could not stat current working directory")?;
     let full_paths = paths
         .into_iter()
@@ -67,11 +86,11 @@ fn entry_from_line(line: String) -> Result<HistfileEntry> {
 
     assert!(line_split.len() >= 2);
     // SAFETY: above assert
-    let hist_type = match *(unsafe { line_split.get_unchecked(0) }) {
-        "mv" => HistoryType::Move,
-        "cp" => HistoryType::Copy,
-        unknown => bail!("Invalid history type '{unknown}'"),
-    };
+    let hist_type_str = *(unsafe { line_split.get_unchecked(0) });
+    let hist_type = HistoryType::from(hist_type_str);
+    if hist_type == HistoryType::Unknown {
+        bail!("Unknown history type: {}", hist_type_str);
+    }
 
     let paths: Vec<PathBuf> = line_split[1..].iter().copied().map(PathBuf::from).collect();
 
@@ -103,17 +122,6 @@ pub fn get_last_n(histfile: File, num: usize) -> Result<Vec<HistfileEntry>> {
     if error_count != 0 {
         eprintln!("Warning: some history entries could not be read.");
     }
-    // Not enough entries
-    if error_count + requested_lines.len() != num {
-        eprintln!("Requested {} entries, found {}", num, requested_lines.len());
-    }
 
     Ok(requested_lines)
-}
-
-pub fn histfile_contents(mut histfile: File) -> Result<()> {
-    let mut buf = String::with_capacity(histfile.metadata().unwrap().len() as usize);
-    histfile.read_to_string(&mut buf)?;
-    println!("{buf}");
-    Ok(())
 }

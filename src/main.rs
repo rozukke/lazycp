@@ -7,7 +7,7 @@ use std::{fs::OpenOptions, path::PathBuf};
 
 use anyhow::{Context, Result};
 use clap::{Parser, Subcommand};
-use lazycp::{copy, do_move, history, paste};
+use lazycp::{clear, copy, history, move_cmd, paste};
 
 /// The easiest way to copy for people who have too many terminals open.
 #[derive(Parser)]
@@ -98,7 +98,7 @@ fn main() -> Result<()> {
 
     match args.command {
         Command::Copy { files } => copy(histfile, files),
-        Command::Move { files } => do_move(histfile, files),
+        Command::Move { files } => move_cmd(histfile, files),
         Command::Paste {
             dest,
             host,
@@ -106,7 +106,7 @@ fn main() -> Result<()> {
             index,
             parents,
         } => paste(histfile, index, dest),
-        Command::Clear => todo!(),
+        Command::Clear => clear(histfile),
         Command::History { number } => history(histfile, number),
     }
 }
