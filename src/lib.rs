@@ -1,18 +1,17 @@
 mod histfile;
 
 use anyhow::{Context, Result, bail};
-use std::{
-    fs::{self, File},
-    path::PathBuf,
-};
+use fs_extra::{copy_items, dir::CopyOptions, move_items};
+use std::{fs::File, path::PathBuf};
 
 use crate::histfile::{HistfileEntry, HistoryType};
 
 pub fn copy(histfile: File, paths: Vec<PathBuf>) -> Result<()> {
-    let (paths, invalid): (Vec<_>, Vec<_>) = paths.into_iter().partition(|f| f.is_file());
+    let (paths, invalid): (Vec<_>, Vec<_>) =
+        paths.into_iter().partition(|f| f.is_file() || f.is_dir());
     invalid.into_iter().for_each(|inv_path| {
         eprintln!(
-            "File does not exist or is a directory: {}\nSkipping...",
+            "File does not exist: {}\nSkipping...",
             inv_path.to_string_lossy()
         )
     });
@@ -43,25 +42,11 @@ pub fn paste(histfile: File, index: Option<usize>, dest: Option<PathBuf>) -> Res
     }
 
     let entry = histfile::read_entry(histfile, index.unwrap_or(0))?;
+    let options = CopyOptions::new().overwrite(true);
+    // TODO: this fs_extra lib is pretty crap and opaque. Should switch to walkdir
     match entry.hist_type {
-        HistoryType::Copy => entry.paths.iter().for_each(|path| {
-            if let Err(err) = fs::copy(path, &(work_dir.join(path.file_name().unwrap()))) {
-                eprintln!(
-                    "Could not copy file {} to destination {}: {err}",
-                    path.to_str().unwrap(),
-                    work_dir.to_str().unwrap()
-                );
-            };
-        }),
-        HistoryType::Move => entry.paths.iter().for_each(|path| {
-            if let Err(err) = fs::rename(path, &(work_dir.join(path.file_name().unwrap()))) {
-                eprintln!(
-                    "Could not move file {} to destination {}: {err}",
-                    path.to_str().unwrap(),
-                    work_dir.to_str().unwrap()
-                );
-            };
-        }),
+        HistoryType::Copy => copy_items(&entry.paths, work_dir, &options)?,
+        HistoryType::Move => move_items(&entry.paths, work_dir, &options)?,
         HistoryType::Unknown => unreachable!(),
     };
 

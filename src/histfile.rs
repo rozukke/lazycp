@@ -7,8 +7,6 @@ use std::{
     path::PathBuf,
 };
 
-use crate::histfile;
-
 #[derive(PartialEq, Eq)]
 pub enum HistoryType {
     Move,
