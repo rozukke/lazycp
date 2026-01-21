@@ -105,7 +105,7 @@ fn main() -> Result<()> {
             resolve_symlinks,
             index,
             parents,
-        } => paste(histfile, index, dest),
+        } => paste(histfile, index, dest, resolve_symlinks.unwrap_or(false)),
         Command::Clear => clear(histfile),
         Command::History { number } => history(histfile, number),
     }

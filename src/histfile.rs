@@ -42,19 +42,13 @@ pub struct HistfileEntry {
 
 pub fn write_entry(mut histfile: File, hist_type: HistoryType, paths: Vec<PathBuf>) -> Result<()> {
     if paths.len() == 0 {
-        bail!("Could not write entry for zero-file copy.");
+        bail!("No valid paths provided");
     }
-
-    let work_dir = std::env::current_dir().context("Could not stat current working directory")?;
-    let full_paths = paths
-        .into_iter()
-        .map(|path| work_dir.join(path))
-        .collect::<Vec<PathBuf>>();
 
     writeln!(
         histfile,
         "{hist_type}\0{}",
-        full_paths
+        paths
             .iter()
             .map(|path| path.as_os_str())
             .collect::<Vec<_>>()
